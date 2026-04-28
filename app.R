@@ -8,9 +8,6 @@ library(leaflet)
 library(jsonlite)
 library(shinycssloaders)
 
-# Grab the secret from Railway
-INTERNAL_PASS <- Sys.getenv("LAB_PASSWORD", unset = "admin")
-
 # ============================================================
 #  CONTINENT CLASSIFIER (7 continents, Hawaii excluded)
 # ============================================================
