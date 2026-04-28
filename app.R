@@ -1,4 +1,4 @@
-#SECTION A===============================================================================================
+# SECTION A ===============================================================================================
 library(shiny)
 library(DBI)
 library(RPostgres)
@@ -14,33 +14,25 @@ library(shinycssloaders)
 continent_from_latlon = function(lat, lon) {
   case_when(
     !is.na(lat) & lat <= -60 ~ "Antarctica",
-    
-    # North America (Hawaii excluded)
     !is.na(lat) & !is.na(lon) &
       lat >= 5  & lat <= 83 &
       lon >= -170 & lon <= -50 &
       !(lat >= 18 & lat <= 23 & lon >= -161 & lon <= -154) ~ "North America",
-    
     !is.na(lat) & !is.na(lon) &
       lat >= -56 & lat <= 12 &
       lon >= -82 & lon <= -34 ~ "South America",
-    
     !is.na(lat) & !is.na(lon) &
       lat >= 35 & lat <= 71 &
       lon >= -25 & lon <= 45 ~ "Europe",
-    
     !is.na(lat) & !is.na(lon) &
       lat >= -35 & lat <= 37 &
       lon >= -20 & lon <= 52 ~ "Africa",
-    
     !is.na(lat) & !is.na(lon) &
       lat >= 1 & lat <= 77 &
       lon >= 26 & lon <= 180 ~ "Asia",
-    
     !is.na(lat) & !is.na(lon) &
       lat >= -50 & lat <= 0 &
       lon >= 110 & lon <= 180 ~ "Oceania",
-    
     TRUE ~ NA_character_
   )
 }
@@ -71,7 +63,7 @@ Shiny.addCustomMessageHandler('scrollToHzItem', function(message) {
 "
 
 # ============================================================
-#  DATABASE CONNECTION (Local Version)
+#  DATABASE CONNECTION (Railway / Environment Variables)
 # ============================================================
 con = dbConnect(
   RPostgres::Postgres(),
@@ -87,7 +79,6 @@ onStop(function() dbDisconnect(con))
 # ============================================================
 #  LOAD + CLEAN DATA
 # ============================================================
-# Using your original local table name
 hz = dbReadTable(con, "hybrid_zone_final") %>%
   mutate(
     id    = row_number(),
@@ -130,99 +121,40 @@ hz = dbReadTable(con, "hybrid_zone_final") %>%
 # ============================================================
 #  COLOR PALETTE & AUTOCOMPLETE LIST
 # ============================================================
-safe_palette = c(
-  "#E69F00", "#56B4E9", "#D55E00",
-  "#CC79A7", "#F0E442", "#A6761D"
-)
-
-# 1. Get the unique lowercase values
+safe_palette = c("#E69F00", "#56B4E9", "#D55E00", "#CC79A7", "#F0E442", "#A6761D")
 taxa = sort(unique(hz$taxon_category_clean))
 taxa = taxa[taxa != "" & !is.na(taxa) & taxa != "na"]
-
-# 2. Create the display names (Title Case)
 taxa_display_names = tools::toTitleCase(taxa)
-
-# 3. Create a named vector: names = What User Sees, values = What Server Uses
 taxa_choices = setNames(taxa, taxa_display_names)
-
-# 4. Keep your palette logic using the lowercase values
 pal_colors = setNames(safe_palette[seq_along(taxa)], taxa)
 pal = colorFactor(unname(pal_colors), taxa)
 
-# Create a master list of all names (Scientific and Common) for search
 all_species = sort(unique(c(
   hz$species1_name, hz$species2_name, 
   hz$species1_common_name, hz$species2_common_name
 )))
-# Remove NAs or empty strings from the search list
 all_species = all_species[all_species != "" & !is.na(all_species)]
 
-#SECTION B===========================================================================================================
+# SECTION B ===========================================================================================================
 ui = fluidPage(
-  
-  # 1. KEEP CUSTOM STYLES (Always loaded)
   tags$head(
     tags$style(HTML("
-      .with-spinner > div {
-        padding-bottom: 0 !important;
-      }
-
+      .with-spinner > div { padding-bottom: 0 !important; }
       #map-summary {
-        position: absolute;
-        bottom: 5px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: none;
-        padding: 0;
-        font-size: 14px;
-        text-align: center;
-        white-space: pre-line;
-        pointer-events: none;
-        z-index: 9999;
-        line-height: 1.25;
-        border: none;
+        position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+        background: none; font-size: 14px; text-align: center; white-space: pre-line;
+        pointer-events: none; z-index: 9999; line-height: 1.25; border: none;
       }
-
-      /* Force all sidebar inputs to take full width */
-      .sidebar-inputs .shiny-input-container {
-        width: 100% !important;
-      }
-      .sidebar-inputs .selectize-control {
-        width: 100% !important;
-      }
-
-      .hz-item {
-        padding: 6px 8px;
-        margin-bottom: 4px;
-        border-radius: 4px;
-        cursor: pointer;
-        border: 1px solid #ddd;
-        background-color: #ffffff;
-        font-size: 0.9em;
-      }
-      .hz-item:hover {
-        background-color: #f5f7fb;
-      }
-      .hz-item-selected {
-        background-color: #f0f4ff !important;
-        border-color: #4a90e2 !important;
-      }
-      .hz-item-title {
-        font-weight: 600;
-        margin-bottom: 2px;
-      }
-      .hz-item-meta {
-        font-size: 0.85em;
-      }
-      
-      .equal-height-row {
-        display: flex;
-        flex-wrap: wrap;
-      }
+      .sidebar-inputs .shiny-input-container, .sidebar-inputs .selectize-control { width: 100% !important; }
+      .hz-item { padding: 6px 8px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; border: 1px solid #ddd; background-color: #ffffff; font-size: 0.9em; }
+      .hz-item:hover { background-color: #f5f7fb; }
+      .hz-item-selected { background-color: #f0f4ff !important; border-color: #4a90e2 !important; }
+      .hz-item-title { font-weight: 600; margin-bottom: 2px; }
+      .hz-item-meta { font-size: 0.85em; }
+      .equal-height-row { display: flex; flex-wrap: wrap; }
     "))
   ),
   
-  # 2. LOGIN OVERLAY (Visible until successful login)
   div(id = "login_page",
       style = "max-width: 450px; margin: 100px auto; padding: 20px;",
       wellPanel(
@@ -233,7 +165,6 @@ ui = fluidPage(
       )
   ),
   
-  # 3. THE SECURE RESEARCH UI (Hidden until login)
   uiOutput("secure_ui")
 )
 
@@ -241,13 +172,9 @@ ui = fluidPage(
 server = function(input, output, session) {
   
   # 1. AUTHENTICATION SETUP ---------------------------------------------------
-  # Fetches the secret from Railway. Defaults to 'admin' if the variable is missing.
   INTERNAL_PASS <- Sys.getenv("LAB_PASSWORD", unset = "admin")
-  
-  # Reactive value to track login status
   auth <- reactiveVal(FALSE)
   
-  # Handle login attempt
   observeEvent(input$login_btn, {
     if (input$password_input == INTERNAL_PASS) {
       auth(TRUE)
@@ -258,13 +185,11 @@ server = function(input, output, session) {
   })
   
   # 2. SECURE UI WRAPPER ------------------------------------------------------
-  # This renders the full "Hybrid Zone Explorer" UI only after auth is TRUE.
   output$secure_ui <- renderUI({
     req(auth())
     
     tagList(
       titlePanel("Hybrid Zone Explorer"),
-      
       fluidRow(
         class = "equal-height-row",
         column(3,
@@ -278,11 +203,11 @@ server = function(input, output, session) {
                    textInput("species_text", "Search species:", value = "", placeholder = "Type a species name...", width = "100%"),
                    
                    tags$script(HTML(sprintf("
-              $(function() {
-                var speciesList = %s;
-                $('#species_text').autocomplete({ source: speciesList, minLength: 1 });
-              });
-            ", jsonlite::toJSON(all_species)))),
+                      $(function() {
+                        var speciesList = %s;
+                        $('#species_text').autocomplete({ source: speciesList, minLength: 1 });
+                      });
+                    ", jsonlite::toJSON(all_species)))),
                    
                    selectInput("taxon_filter", "Filter by Taxon Category:", choices = c("All" = "All", taxa_choices), width = "100%"),
                    selectInput("habitat_filter", "Habitat type:", choices = c("All", "Terrestrial", "Aquatic"), width = "100%"),
@@ -330,7 +255,6 @@ server = function(input, output, session) {
   
   # 3. RESEARCH LOGIC (Nester Functions & Reactives) --------------------------
   
-  # Utility for citations
   format_citations = function(citation_str, doi_str) {
     if (is.na(citation_str) || !nzchar(citation_str) || citation_str == "na") return(tags$span("")) 
     cites = str_split(citation_str, fixed("|"))[[1]] %>% str_trim()
@@ -353,53 +277,102 @@ server = function(input, output, session) {
     selected_row(NULL)
   })
   
+  # 1. FILTERED DATA REACTIVE
   filtered_data = reactive({
     req(auth())
+    
     data = hz
-    if (input$species_text != "") {
+    
+    # Species Search: Only run if the input exists and isn't empty
+    if (isTruthy(input$species_text)) {
       sp = tolower(str_squish(input$species_text))
-      data = data %>% filter(str_detect(species1_clean, fixed(sp)) | str_detect(species2_clean, fixed(sp)) | 
-                               str_detect(species1_common_clean, fixed(sp)) | str_detect(species2_common_clean, fixed(sp)))
+      data = data %>% filter(
+        str_detect(species1_clean, fixed(sp)) | 
+          str_detect(species2_clean, fixed(sp)) | 
+          str_detect(species1_common_clean, fixed(sp)) | 
+          str_detect(species2_common_clean, fixed(sp))
+      )
     }
-    if (input$taxon_filter != "All") data = data %>% filter(taxon_category_clean == input$taxon_filter)
-    if (input$habitat_filter != "All") data = data %>% filter(habitat_type == input$habitat_filter)
-    if (input$continent_filter == "None / Open Water") {
-      data = data %>% filter(is.na(continent))
-    } else if (input$continent_filter != "All") {
-      data = data %>% filter(continent == input$continent_filter)
+    
+    # Taxon Filter: Only run if the dropdown has actually rendered in the UI
+    if (isTruthy(input$taxon_filter)) {
+      if (input$taxon_filter != "All") {
+        data = data %>% filter(taxon_category_clean == input$taxon_filter)
+      }
     }
+    
+    # Habitat Filter
+    if (isTruthy(input$habitat_filter)) {
+      if (input$habitat_filter != "All") {
+        data = data %>% filter(habitat_type == input$habitat_filter)
+      }
+    }
+    
+    # Continent Filter
+    if (isTruthy(input$continent_filter)) {
+      if (input$continent_filter == "None / Open Water") {
+        data = data %>% filter(is.na(continent))
+      } else if (input$continent_filter != "All") {
+        data = data %>% filter(continent == input$continent_filter)
+      }
+    }
+    
     data
   })
   
+  # 2. VISIBLE DATA REACTIVE
   visible_data = reactive({
     req(auth())
     data = filtered_data()
     bounds = input$map_bounds
-    if (is.null(bounds)) return(data)
-    data %>% filter(latitude <= bounds$north, latitude >= bounds$south, longitude <= bounds$east, longitude >= bounds$west)
+    # If the map hasn't loaded bounds yet, return all filtered data
+    if (is.null(bounds)) return(data) 
+    
+    data %>% filter(
+      latitude <= bounds$north, 
+      latitude >= bounds$south, 
+      longitude <= bounds$east, 
+      longitude >= bounds$west
+    )
   })
   
+  # 3. MAP SUMMARY TEXT
   output$map_summary = renderText({
     req(auth())
+    # Don't try to summarize until the filters actually exist
+    req(isTruthy(input$taxon_filter)) 
+    
     data = visible_data()
     if (nrow(data) == 0) return("No hybrid zones visible")
+    
     line1 = paste0(nrow(data), " hybrid zones visible")
     tax_counts = data %>% count(taxon_category_clean) %>% arrange(taxon_category_clean)
     line2 = paste(paste0(tax_counts$n, " ", tools::toTitleCase(tax_counts$taxon_category_clean)), collapse = " • ")
     paste0(line1, "\n", line2)
   })
   
+  # 4. LEAFLET MAP RENDER
   output$map = renderLeaflet({
     req(auth())
-    leaflet(options = leafletOptions(worldCopyJump = FALSE, preferCanvas = TRUE, minZoom = 2, maxBounds = list(c(-85, -180), c(85, 180)))) %>%
+    
+    leaflet(options = leafletOptions(
+      worldCopyJump = FALSE, 
+      preferCanvas = TRUE, 
+      minZoom = 2, 
+      maxBounds = list(c(-85, -180), c(85, 180))
+    )) %>%
       addProviderTiles(providers$OpenStreetMap) %>%
       addProviderTiles(providers$CartoDB.Positron, group = "CartoDB") %>%
       addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
       setView(lng = 0, lat = 20, zoom = 2) %>%
       addScaleBar(position = "bottomleft") %>%
-      addLayersControl(baseGroups = c("OpenStreetMap", "CartoDB", "Satellite"), options = layersControlOptions(collapsed = FALSE))
+      addLayersControl(
+        baseGroups = c("OpenStreetMap", "CartoDB", "Satellite"), 
+        options = layersControlOptions(collapsed = FALSE)
+      )
   })
   
+  # 5. HIGHLIGHT POINT FUNCTION
   highlight_point = function(row) {
     leafletProxy("map") %>%
       clearGroup("highlight") %>%
@@ -407,16 +380,29 @@ server = function(input, output, session) {
       addCircleMarkers(lng = row$longitude, lat = row$latitude, radius = 8, color = pal(row$taxon_category_clean), fillColor = pal(row$taxon_category_clean), fillOpacity = 1, weight = 1, opacity = 1, group = "highlight")
   }
   
+  # 6. MARKER OBSERVER
   observe({
     req(auth())
+    # This is the "secret sauce"—don't try to draw markers until the map exists
+    req(input$map_center) 
+    
     data = filtered_data()
-    proxy = leafletProxy("map", data = data) %>% clearMarkers() %>% clearControls() %>% clearGroup("highlight")
+    proxy = leafletProxy("map", data = data) %>% 
+      clearMarkers() %>% 
+      clearControls() %>% 
+      clearGroup("highlight")
+    
     if (nrow(data) > 0) {
       proxy %>%
-        addCircleMarkers(lng = ~longitude, lat = ~latitude, radius = 6, color = ~pal(taxon_category_clean), fillOpacity = 0.8, layerId = ~pt_id,
-                         label = ~paste0("<i>", tools::toTitleCase(species1_name), "</i> × <i>", tools::toTitleCase(species2_name), "</i>") %>% lapply(htmltools::HTML)
+        addCircleMarkers(
+          lng = ~longitude, lat = ~latitude, radius = 6, 
+          color = ~pal(taxon_category_clean), fillOpacity = 0.8, layerId = ~pt_id,
+          label = ~paste0("<i>", tools::toTitleCase(species1_name), "</i> × <i>", tools::toTitleCase(species2_name), "</i>") %>% 
+            lapply(htmltools::HTML)
         ) %>%
-        addLegend("bottomright", colors = unname(pal_colors), labels = tools::toTitleCase(names(pal_colors)), title = "Taxon Category", opacity = 1)
+        addLegend("bottomright", colors = unname(pal_colors), 
+                  labels = tools::toTitleCase(names(pal_colors)), 
+                  title = "Taxon Category", opacity = 1)
     }
   })
   
