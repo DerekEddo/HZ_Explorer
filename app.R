@@ -120,14 +120,17 @@ hz = dbReadTable(con, "hybrid_zone_final") %>%
 #  COLOR PALETTE & AUTOCOMPLETE LIST
 # ============================================================
 # High-visibility palette with custom orange and dark brown
+# Taxonomic order: Amphibian, Bird, Fish, Invert, Mammal, Reptile
+# Taxonomic order: Amphibian, Bird, Fish, Invert, Mammal, Reptile
 safe_palette = c(
-  "#FF2F2F", # Bright Red
-  "#FFD700", # Pure Yellow
-  "#00CCFF", # Light Blue
-  "#E1C699", # Tan
-  "#5D00B4", # Dark Purple
-  "#FF00FF"  # Magenta
+  "#7FFF00", # Amphibian (chartreuse)
+  "#40E0D0", # Bird (turquoise)
+  "#FF7F50", # Fish (coral)
+  "#FF83FA", # Invert (orchid1)
+  "#FFFF00", # Mammal (yellow1)
+  "#AB82FF"  # Reptile (mediumpurple1)
 )
+
 taxa = sort(unique(hz$taxon_category_clean))
 taxa = taxa[taxa != "" & !is.na(taxa) & taxa != "na"]
 taxa_display_names = tools::toTitleCase(taxa)
@@ -385,12 +388,12 @@ server = function(input, output, session) {
       addCircleMarkers(
         lng = row$longitude, 
         lat = row$latitude, 
-        radius = 8,              # Just a nudge bigger than the 6px dots
+        radius = 5,              # Slightly larger than the new 4px base size
         fillColor = target_color, 
         fillOpacity = 1.0,
         stroke = TRUE, 
-        color = "#000000",       # The black ring
-        weight = 3,              # Extra weight to make the highlight "pop"
+        color = "#000000",       # Maintained the black ring
+        weight = 2.5,            # Thicker weight for the highlighted point
         opacity = 1.0,
         group = "highlight"
       )
@@ -412,12 +415,12 @@ server = function(input, output, session) {
         addCircleMarkers(
           lng = ~longitude, 
           lat = ~latitude, 
-          radius = 6,                 # Back to original size
+          radius = 4,                 # Reduced to 4 to minimize overlap
           fillColor = ~pal(taxon_category_clean), 
-          fillOpacity = 1.0,          # Keeps color solid for satellite view
+          fillOpacity = 1.0, 
           stroke = TRUE, 
-          color = "#000000",          # The black ring
-          weight = 1.5,               # Thinner, sleeker outline
+          color = "#000000",          # Maintained the black ring
+          weight = 1.2,               # Slightly thinner stroke for smaller radius
           opacity = 1.0, 
           layerId = ~pt_id,
           label = ~paste0("<i>", tools::toTitleCase(species1_name), "</i> × <i>", tools::toTitleCase(species2_name), "</i>") %>% 
@@ -526,82 +529,96 @@ server = function(input, output, session) {
     row = selected_row()
     if (is.null(row)) return(NULL)
     
-    centers = c(row$new_pheno_geno_cline_center, row$new_genomic_cline_center, row$new_mt_cline_center, row$new_n_cline_center, row$new_pheno_cline_center)
-    widths  = c(row$new_pheno_geno_cline_width, row$new_genomic_cline_width, row$new_mt_cline_width, row$new_n_cline_width, row$new_pheno_cline_width)
-    width_lower = c(NA, NA, row$new_mt_width_uncertainty_lower_bound, row$new_nuc_width_uncertainty_lower_bound, row$new_pheno_width_uncertainty_lower_bound)
-    width_upper = c(NA, NA, row$new_mt_width_uncertainty_upper_bound, row$new_nuc_width_uncertainty_upper_bound, row$new_pheno_width_uncertainty_upper_bound)
+    # 1. ORGANIZE DATA
+    centers = c(row$new_pheno_geno_cline_center, row$new_genomic_cline_center, 
+                row$new_mt_cline_center, row$new_n_cline_center, row$new_pheno_cline_center)
+    widths  = c(row$new_pheno_geno_cline_width, row$new_genomic_cline_width, 
+                row$new_mt_cline_width, row$new_n_cline_width, row$new_pheno_cline_width)
+    
+    # Uncertainty bounds (Pheno-Genomic and Genomic are NA per your setup)
+    width_lower = c(NA, NA, row$new_mt_width_uncertainty_lower_bound, 
+                    row$new_nuc_width_uncertainty_lower_bound, row$new_pheno_width_uncertainty_lower_bound)
+    width_upper = c(NA, NA, row$new_mt_width_uncertainty_upper_bound, 
+                    row$new_nuc_width_uncertainty_upper_bound, row$new_pheno_width_uncertainty_upper_bound)
     
     labels = c("Pheno-Genomic", "Genomic", "mtDNA", "nDNA", "Phenotype")
-    cols = c("#FF2F2F", "#FFD700", "#00CCFF", "#E1C699", "#5D00B4")
+    
+    # Applying the Tol Colorblind-Safe Palette
+    cols = c(  "#DDCC77","#88CCEE","#CC6677", "#117733", "#AA4499")
     
     valid = !(is.na(centers) | is.na(widths))
     
     if (sum(valid) == 0) {
-      plot.new(); text(0.5,0.5,"No cline available for this hybrid zone", cex=2); return()
+      plot.new(); text(0.5, 0.5, "No cline available for this hybrid zone", cex = 2); return()
     }
     
-    xmin = min(centers[valid]-3*widths[valid], na.rm=TRUE); xmax = max(centers[valid]+3*widths[valid], na.rm=TRUE)
+    # 2. SETUP PLOT AREA
+    xmin = min(centers[valid] - 3 * widths[valid], na.rm = TRUE)
+    xmax = max(centers[valid] + 3 * widths[valid], na.rm = TRUE)
     
-    # Increased margins to accommodate larger font sizes
+    # Margins adjusted for large axis labels
     par(lend = 0, mar = c(6, 6, 5, 2) + 0.1) 
     
-    # --- FONT SIZE UPDATES ---
     plot(NA, xlim = c(xmin, xmax), ylim = c(0, 1), 
          xlab = "Transect distance (km, relative units)", 
          ylab = "Trait / allele frequency", 
          main = "Hybrid Zone Clines", 
-         cex.lab = 1.8,    # Larger axis labels (X and Y)
-         cex.axis = 1.5,   # Larger axis numbers
-         cex.main = 2.2,   # Larger main title
+         cex.lab = 1.8, cex.axis = 1.5, cex.main = 2.2, 
          xaxs = "i", yaxs = "i", yaxt = "n")
     
-    # Add a subtitle for technical definitions
-    mtext("Horizontal bars = estimated cline width; Shaded areas = 95% CI", 
-          side = 3, line = 0.5, cex = 1.2, font = 3) # font = 3 makes it italic
+    # Marginal note explaining visual elements
+    mtext("Horizontal bars = estimated width", 
+          side = 3, line = 0.5, cex = 1.2, font = 3, col = "gray30")
     
-    # Side axis with larger numbers
     axis(side = 2, at = seq(0, 1, 0.2), labels = seq(0, 1, 0.2), 
          las = 1, cex.axis = 1.5, tck = -0.02)
     
-    offset_step = 0.06; offset_index = 0
+    # 3. DRAW CLINES AND POLYGONS
+    offset_step = 0.06
+    offset_index = 0
+    
     for (i in seq_along(centers)) {
       c = centers[i]; w = widths[i]; if (is.na(c) || is.na(w)) next
+      
       x = seq(xmin, xmax, length.out = 200)
       x_centered = x - mean(centers[valid])
-      y = 1/(1 + exp(-4*(x_centered - (c - mean(centers[valid])))/w))
+      y = 1 / (1 + exp(-4 * (x_centered - (c - mean(centers[valid]))) / w))
       
+      # Draw 95% CI Shading at 60% Opacity
       w_l = width_lower[i]; w_u = width_upper[i]
       if (!is.na(w_l) && !is.na(w_u)) {
-        ci_u = 1/(1 + exp(-4*(x - c)/w_l)); ci_l = 1/(1 + exp(-4*(x - c)/w_u))
-        polygon(c(x, rev(x)), c(ci_u, rev(ci_l)), col = adjustcolor(cols[i], alpha.f = 0.2), border = NA)
+        ci_u = 1 / (1 + exp(-4 * (x - c) / w_l))
+        ci_l = 1 / (1 + exp(-4 * (x - c) / w_u))
+        polygon(c(x, rev(x)), c(ci_u, rev(ci_l)), 
+                col = adjustcolor(cols[i], alpha.f = 0.6), border = NA)
       }
+      
+      # Draw Main Cline Line
       lines(x, y, lwd = 7.5, col = cols[i])
       
-      y_off = 0.5 + (offset_index - (sum(valid)-1)/2) * offset_step
+      # Draw Width Segment Bar
+      y_off = 0.5 + (offset_index - (sum(valid) - 1) / 2) * offset_step
       segments(x0 = c - w/2, x1 = c + w/2, y0 = y_off, y1 = y_off, 
                col = adjustcolor(cols[i], alpha.f = 0.7), lwd = 7.5, lend = 1)
+      
       offset_index = offset_index + 1
     }
     
-    # --- UNIFIED DYNAMIC LEGEND ---
-    shaded_cols = adjustcolor(cols[valid], alpha.f = 0.2)
+    # 4. UNIFIED DYNAMIC LEGEND
+    # Legend shading matches the 60% opacity on the plot
+    shaded_cols = adjustcolor(cols[valid], alpha.f = 0.6)
     
     legend("bottomright", 
-           # Updated title to explicitly link the bar/line to the width
            title = "Clines & 95% CIs",
-           title.adj = 0.1,         # Slightly align title for better flow
            legend = labels[valid], 
            col = cols[valid],
            fill = shaded_cols,      
            border = cols[valid],    
-           lty = 1, 
-           lwd = 5, 
+           lty = 1, lwd = 5, 
            merge = TRUE,            
-           
-           # Final adjustments for "Big" display
-           cex = 1.4,               # Legend text size
-           pt.cex = 5,              # Legend box size
-           y.intersp = 1.4,         # More vertical spacing for large text
+           cex = 1.4,               
+           pt.cex = 5,              
+           y.intersp = 1.4,         
            x.intersp = 1.2,         
            bty = "n")               
   })
