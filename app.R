@@ -67,14 +67,12 @@ Shiny.addCustomMessageHandler('scrollToHzItem', function(message) {
 # ============================================================
 con = dbConnect(
   RPostgres::Postgres(),
-  dbname   = Sys.getenv("HZ_DB_NAME"),
-  host     = Sys.getenv("HZ_DB_HOST"),
-  port     = Sys.getenv("HZ_DB_PORT"),
-  user     = Sys.getenv("HZ_DB_USER"),
-  password = Sys.getenv("HZ_DB_PASS")
+  dbname   = Sys.getenv("PGDATABASE"),
+  host     = Sys.getenv("PGHOST"),
+  port     = as.numeric(Sys.getenv("PGPORT")),
+  user     = Sys.getenv("PGUSER"),
+  password = Sys.getenv("PGPASSWORD")
 )
-
-onStop(function() dbDisconnect(con))
 
 # ============================================================
 #  LOAD + CLEAN DATA
