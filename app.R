@@ -119,7 +119,15 @@ hz = dbReadTable(con, "hybrid_zone_final") %>%
 # ============================================================
 #  COLOR PALETTE & AUTOCOMPLETE LIST
 # ============================================================
-safe_palette = c("#E69F00", "#56B4E9", "#D55E00", "#CC79A7", "#F0E442", "#A6761D")
+# High-visibility palette with custom orange and dark brown
+safe_palette = c(
+  "#FF2F2F", # Bright Red
+  "#FFD700", # Pure Yellow
+  "#00CCFF", # Light Blue
+  "#E1C699", # Tan
+  "#5D00B4", # Dark Purple
+  "#FF00FF"  # Magenta
+)
 taxa = sort(unique(hz$taxon_category_clean))
 taxa = taxa[taxa != "" & !is.na(taxa) & taxa != "na"]
 taxa_display_names = tools::toTitleCase(taxa)
@@ -349,7 +357,6 @@ server = function(input, output, session) {
     paste0(line1, "\n", line2)
   })
   
-  # 4. LEAFLET MAP RENDER
   output$map = renderLeaflet({
     req(auth())
     
@@ -360,28 +367,38 @@ server = function(input, output, session) {
       maxBounds = list(c(-85, -180), c(85, 180))
     )) %>%
       addProviderTiles(providers$OpenStreetMap) %>%
-      addProviderTiles(providers$CartoDB.Positron, group = "CartoDB") %>%
       addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
       setView(lng = 0, lat = 20, zoom = 2) %>%
       addScaleBar(position = "bottomleft") %>%
       addLayersControl(
-        baseGroups = c("OpenStreetMap", "CartoDB", "Satellite"), 
+        baseGroups = c("OpenStreetMap", "Satellite"), 
         options = layersControlOptions(collapsed = FALSE)
       )
   })
   
   # 5. HIGHLIGHT POINT FUNCTION
   highlight_point = function(row) {
+    target_color = pal(row$taxon_category_clean)
+    
     leafletProxy("map") %>%
       clearGroup("highlight") %>%
-      addCircleMarkers(lng = row$longitude, lat = row$latitude, radius = 10, color = "black", weight = 4, fillOpacity = 0, opacity = 1, group = "highlight") %>%
-      addCircleMarkers(lng = row$longitude, lat = row$latitude, radius = 8, color = pal(row$taxon_category_clean), fillColor = pal(row$taxon_category_clean), fillOpacity = 1, weight = 1, opacity = 1, group = "highlight")
+      addCircleMarkers(
+        lng = row$longitude, 
+        lat = row$latitude, 
+        radius = 8,              # Just a nudge bigger than the 6px dots
+        fillColor = target_color, 
+        fillOpacity = 1.0,
+        stroke = TRUE, 
+        color = "#000000",       # The black ring
+        weight = 3,              # Extra weight to make the highlight "pop"
+        opacity = 1.0,
+        group = "highlight"
+      )
   }
   
   # 6. MARKER OBSERVER
   observe({
     req(auth())
-    # This is the "secret sauce"—don't try to draw markers until the map exists
     req(input$map_center) 
     
     data = filtered_data()
@@ -393,14 +410,24 @@ server = function(input, output, session) {
     if (nrow(data) > 0) {
       proxy %>%
         addCircleMarkers(
-          lng = ~longitude, lat = ~latitude, radius = 6, 
-          color = ~pal(taxon_category_clean), fillOpacity = 0.8, layerId = ~pt_id,
+          lng = ~longitude, 
+          lat = ~latitude, 
+          radius = 6,                 # Back to original size
+          fillColor = ~pal(taxon_category_clean), 
+          fillOpacity = 1.0,          # Keeps color solid for satellite view
+          stroke = TRUE, 
+          color = "#000000",          # The black ring
+          weight = 1.5,               # Thinner, sleeker outline
+          opacity = 1.0, 
+          layerId = ~pt_id,
           label = ~paste0("<i>", tools::toTitleCase(species1_name), "</i> × <i>", tools::toTitleCase(species2_name), "</i>") %>% 
             lapply(htmltools::HTML)
         ) %>%
-        addLegend("bottomright", colors = unname(pal_colors), 
+        addLegend("bottomright", 
+                  colors = unname(pal_colors), 
                   labels = tools::toTitleCase(names(pal_colors)), 
-                  title = "Taxon Category", opacity = 1)
+                  title = "Taxon Category", 
+                  opacity = 1)
     }
   })
   
@@ -503,24 +530,44 @@ server = function(input, output, session) {
     widths  = c(row$new_pheno_geno_cline_width, row$new_genomic_cline_width, row$new_mt_cline_width, row$new_n_cline_width, row$new_pheno_cline_width)
     width_lower = c(NA, NA, row$new_mt_width_uncertainty_lower_bound, row$new_nuc_width_uncertainty_lower_bound, row$new_pheno_width_uncertainty_lower_bound)
     width_upper = c(NA, NA, row$new_mt_width_uncertainty_upper_bound, row$new_nuc_width_uncertainty_upper_bound, row$new_pheno_width_uncertainty_upper_bound)
+    
     labels = c("Pheno-Genomic", "Genomic", "mtDNA", "nDNA", "Phenotype")
-    cols = c("#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9")
+    cols = c("#FF2F2F", "#FFD700", "#00CCFF", "#E1C699", "#5D00B4")
+    
     valid = !(is.na(centers) | is.na(widths))
     
     if (sum(valid) == 0) {
-      plot.new(); text(0.5,0.5,"No cline available for this hybrid zone",cex=1.4); return()
+      plot.new(); text(0.5,0.5,"No cline available for this hybrid zone", cex=2); return()
     }
     
     xmin = min(centers[valid]-3*widths[valid], na.rm=TRUE); xmax = max(centers[valid]+3*widths[valid], na.rm=TRUE)
-    par(lend = 0)
-    plot(NA, xlim = c(xmin, xmax), ylim = c(0, 1), xlab = "Transect distance (km, relative units)", ylab = "Trait / allele frequency", 
-         main = "Hybrid Zone Clines", cex.lab = 1.4, cex.axis = 1.2, cex.main = 1.6, xaxs = "i", yaxs = "i", yaxt = "n")
-    axis(side = 2, at = seq(0, 1, 0.2), labels = seq(0, 1, 0.2), las = 1, cex.axis = 1.2, tck = -0.02)
+    
+    # Increased margins to accommodate larger font sizes
+    par(lend = 0, mar = c(6, 6, 5, 2) + 0.1) 
+    
+    # --- FONT SIZE UPDATES ---
+    plot(NA, xlim = c(xmin, xmax), ylim = c(0, 1), 
+         xlab = "Transect distance (km, relative units)", 
+         ylab = "Trait / allele frequency", 
+         main = "Hybrid Zone Clines", 
+         cex.lab = 1.8,    # Larger axis labels (X and Y)
+         cex.axis = 1.5,   # Larger axis numbers
+         cex.main = 2.2,   # Larger main title
+         xaxs = "i", yaxs = "i", yaxt = "n")
+    
+    # Add a subtitle for technical definitions
+    mtext("Horizontal bars = estimated cline width; Shaded areas = 95% CI", 
+          side = 3, line = 0.5, cex = 1.2, font = 3) # font = 3 makes it italic
+    
+    # Side axis with larger numbers
+    axis(side = 2, at = seq(0, 1, 0.2), labels = seq(0, 1, 0.2), 
+         las = 1, cex.axis = 1.5, tck = -0.02)
     
     offset_step = 0.06; offset_index = 0
     for (i in seq_along(centers)) {
       c = centers[i]; w = widths[i]; if (is.na(c) || is.na(w)) next
-      x = seq(xmin, xmax, length.out = 200); x_centered = x - mean(centers[valid])
+      x = seq(xmin, xmax, length.out = 200)
+      x_centered = x - mean(centers[valid])
       y = 1/(1 + exp(-4*(x_centered - (c - mean(centers[valid])))/w))
       
       w_l = width_lower[i]; w_u = width_upper[i]
@@ -531,10 +578,32 @@ server = function(input, output, session) {
       lines(x, y, lwd = 7.5, col = cols[i])
       
       y_off = 0.5 + (offset_index - (sum(valid)-1)/2) * offset_step
-      segments(x0 = c - w/2, x1 = c + w/2, y0 = y_off, y1 = y_off, col = adjustcolor(cols[i], alpha.f = 0.7), lwd = 7.5, lend = 1)
+      segments(x0 = c - w/2, x1 = c + w/2, y0 = y_off, y1 = y_off, 
+               col = adjustcolor(cols[i], alpha.f = 0.7), lwd = 7.5, lend = 1)
       offset_index = offset_index + 1
     }
-    legend("bottomright", legend = labels[valid], col = cols[valid], lty = 1, lwd = 10, cex = 1.5, bty = "n")
+    
+    # --- UNIFIED DYNAMIC LEGEND ---
+    shaded_cols = adjustcolor(cols[valid], alpha.f = 0.2)
+    
+    legend("bottomright", 
+           # Updated title to explicitly link the bar/line to the width
+           title = "Clines & 95% CIs",
+           title.adj = 0.1,         # Slightly align title for better flow
+           legend = labels[valid], 
+           col = cols[valid],
+           fill = shaded_cols,      
+           border = cols[valid],    
+           lty = 1, 
+           lwd = 5, 
+           merge = TRUE,            
+           
+           # Final adjustments for "Big" display
+           cex = 1.4,               # Legend text size
+           pt.cex = 5,              # Legend box size
+           y.intersp = 1.4,         # More vertical spacing for large text
+           x.intersp = 1.2,         
+           bty = "n")               
   })
   
   output$download_filtered_data = downloadHandler(
