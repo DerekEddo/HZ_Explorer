@@ -189,8 +189,10 @@ ui = fluidPage(
   div(id = "login_page",
       style = "max-width: 450px; margin: 100px auto; padding: 20px;",
       wellPanel(
-        h3("Hybrid Zone Explorer Access", style = "text-align: center;"),
-        hr(),
+        # Apply the 2px black border here to match the map and sidebar
+        style = "border: 2px solid #000000; border-radius: 8px; background-color: #f5f5f5;", 
+        h3("Hybrid Zone Explorer Access", style = "text-align: center; font-weight: bold;"),
+        hr(style = "border-top: 1px solid #000000;"), # Optional: darkened the line to match
         passwordInput("password_input", "Enter Lab Password:", placeholder = "Required for database access"),
         actionButton("login_btn", "Log In", class = "btn-primary", style = "width: 100%;")
       )
