@@ -119,16 +119,15 @@ hz = dbReadTable(con, "hybrid_zone_final") %>%
 # ============================================================
 #  COLOR PALETTE & AUTOCOMPLETE LIST
 # ============================================================
-# High-visibility palette with custom orange and dark brown
 # Taxonomic order: Amphibian, Bird, Fish, Invert, Mammal, Reptile
 # Taxonomic order: Amphibian, Bird, Fish, Invert, Mammal, Reptile
 safe_palette = c(
-  "#7FFF00", # Amphibian (chartreuse)
-  "#40E0D0", # Bird (turquoise)
-  "#FF7F50", # Fish (coral)
-  "#FF83FA", # Invert (orchid1)
-  "#FFFF00", # Mammal (yellow1)
-  "#AB82FF"  # Reptile (mediumpurple1)
+  "#CC6677", # Amphibian (Rose)
+  "#DDCC77", # Bird (Sand)
+  "#117733", # Fish (Green)
+  "#AA4499", # Invert (Purple)
+  "#44AA99", # Mammal (Teal)
+  "#999933"  # Reptile (Olive)
 )
 
 taxa = sort(unique(hz$taxon_category_clean))
@@ -146,14 +145,28 @@ all_species = all_species[all_species != "" & !is.na(all_species)]
 
 # SECTION B ===========================================================================================================
 ui = fluidPage(
+  # Style removed from here to revert to default background
   tags$head(
     tags$style(HTML("
+      /* Existing Styles */
       .with-spinner > div { padding-bottom: 0 !important; }
-      #map-summary {
-        position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
-        background: none; font-size: 14px; text-align: center; white-space: pre-line;
-        pointer-events: none; z-index: 9999; line-height: 1.25; border: none;
-      }
+#map-summary {
+        position: absolute; 
+        bottom: 10px;       /* Keeps it at the height you liked */
+        left: 50%; 
+        transform: translateX(-50%); /* This centers the element perfectly */
+        background: none; 
+        font-size: 14px; 
+        text-align: center; 
+        white-space: pre-line;
+        pointer-events: none; 
+        z-index: 9999; 
+        line-height: 1.25; 
+        border: none;
+        color: #000000;      /* Ensure text is black for visibility */
+        width: 100%;        /* Allows text-align center to work across the map width */
+}
+      
       .sidebar-inputs .shiny-input-container, .sidebar-inputs .selectize-control { width: 100% !important; }
       .hz-item { padding: 6px 8px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; border: 1px solid #ddd; background-color: #ffffff; font-size: 0.9em; }
       .hz-item:hover { background-color: #f5f7fb; }
@@ -161,6 +174,15 @@ ui = fluidPage(
       .hz-item-title { font-weight: 600; margin-bottom: 2px; }
       .hz-item-meta { font-size: 0.85em; }
       .equal-height-row { display: flex; flex-wrap: wrap; }
+
+      /* Legend Style */
+      .leaflet .legend {
+        border: 2px solid #000000 !important;
+        border-radius: 5px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.9) !important;
+        box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      }
     "))
   ),
   
@@ -197,68 +219,77 @@ server = function(input, output, session) {
   output$secure_ui <- renderUI({
     req(auth())
     
-    tagList(
-      titlePanel("Hybrid Zone Explorer"),
-      fluidRow(
-        class = "equal-height-row",
-        column(3,
-               div(class = "sidebar-inputs", 
-                   style = "background-color: #f5f5f5; padding: 15px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.05); height: 935px; display: flex; flex-direction: column;",
-                   
-                   tags$div(style = "text-align:center; margin-bottom:20px;",
-                            tags$img(src = "lab.logo.png", height = "80px")
-                   ),
-                   
-                   textInput("species_text", "Search species:", value = "", placeholder = "Type a species name...", width = "100%"),
-                   
-                   tags$script(HTML(sprintf("
-                      $(function() {
-                        var speciesList = %s;
-                        $('#species_text').autocomplete({ source: speciesList, minLength: 1 });
-                      });
-                    ", jsonlite::toJSON(all_species)))),
-                   
-                   selectInput("taxon_filter", "Filter by Taxon Category:", choices = c("All" = "All", taxa_choices), width = "100%"),
-                   selectInput("habitat_filter", "Habitat type:", choices = c("All", "Terrestrial", "Aquatic"), width = "100%"),
-                   selectInput("continent_filter", "Continent:", choices = c("All", "Africa","Antarctica","Asia","Europe","North America","Oceania","South America","None / Open Water"), width = "100%"),
-                   
-                   actionButton("reset", "Reset filters", width = "100%"),
-                   tags$hr(),
-                   downloadButton("download_filtered_data", "Download Filtered Data (.csv)", 
-                                  style = "width: 100%; background-color: #2c3e50; color: white; border: none;"),
-                   
-                   h4("Matching Hybrid Zones"),
-                   tags$div(id = "hz-list-container", 
-                            style = "flex-grow: 1; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 6px;",
-                            uiOutput("results_list")
+    # 1. FIXED WRAPPER: Added 'width: 100%' and 'box-sizing' to eliminate side gaps
+    div(style = "background-color: #228B22; color: black; min-height: 100vh; width: 100%; margin: 0; padding: 20px; box-sizing: border-box; position: absolute; left: 0; top: 0;",
+        tagList(
+          # 2. BLACK TEXT: Changed title color to black
+          titlePanel(h2("Hybrid Zone Explorer", style = "color: black; margin-top: 0; font-weight: bold;")),
+          
+          fluidRow(
+            class = "equal-height-row",
+            # --- 1. LEFT COLUMN ---
+            column(3,
+                   div(class = "sidebar-inputs", 
+                       style = "background-color: #f5f5f5; padding: 15px; border-radius: 8px; border: 2px solid #000000; box-shadow: 0 2px 5px rgba(0,0,0,0.05); height: 700px; display: flex; flex-direction: column; color: black;",
+                       
+                       tags$div(style = "text-align:center; margin-bottom:15px;",
+                                tags$img(src = "lab.logo.png", height = "80px")
+                       ),
+                       
+                       div(style = "margin-bottom: -10px;", 
+                           textInput("species_text", "Search species:", value = "", placeholder = "Type a species name...", width = "100%")),
+                       
+                       tags$script(HTML(sprintf("
+                          $(function() {
+                            var speciesList = %s;
+                            $('#species_text').autocomplete({ source: speciesList, minLength: 1 });
+                          });
+                        ", jsonlite::toJSON(all_species)))),
+                       
+                       div(style = "margin-bottom: -10px;",
+                           selectInput("taxon_filter", "Filter by Taxon Category:", choices = c("All" = "All", taxa_choices), width = "100%")),
+                       
+                       div(style = "margin-bottom: 5px;",
+                           selectInput("continent_filter", "Continent:", choices = c("All", "Africa","Antarctica","Asia","Europe","North America","Oceania","South America","None / Open Water"), width = "100%")),
+                       
+                       downloadButton("download_filtered_data", "Download Filtered Data (.csv)", 
+                                      style = "width: 100%; background-color: #2c3e50; color: white; border: none; margin-bottom: 10px;"),
+                       
+                       h4("Matching Hybrid Zones", style = "margin-top: 5px;"),
+                       tags$div(id = "hz-list-container", 
+                                style = "flex-grow: 1; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 6px;",
+                                uiOutput("results_list")
+                       )
                    )
-               )
-        ),
-        
-        column(9,
-               div(style = "position: relative;",
-                   withSpinner(
-                     div(style = "position: relative;",
-                         leafletOutput("map", height = "935px"),
-                         div(id = "map-summary", textOutput("map_summary"))
-                     )
+            ),
+            
+            # --- 2. RIGHT COLUMN (MAP) ---
+            column(9,
+                   div(style = "position: relative; border: 2px solid #000000; border-radius: 8px; overflow: hidden; background-color: white;",
+                       withSpinner(
+                         div(style = "position: relative;",
+                             leafletOutput("map", height = "697px"),
+                             div(id = "map-summary", textOutput("map_summary"))
+                         )
+                       )
                    )
-               )
+            )
+          ),
+          
+          # --- 3. BOTTOM PANEL ---
+          fluidRow(
+            column(12,
+                   div(style = "margin-top: 15px; padding: 20px; border: 2px solid #000000; border-radius: 8px; background: #fafafa; color: black;",
+                       h3("Selected Hybrid Zone Details"),
+                       uiOutput("details_panel"),
+                       br(),
+                       plotOutput("cline_plot", height = "400px")
+                   )
+            )
+          ),
+          
+          tags$script(HTML(js))
         )
-      ),
-      
-      fluidRow(
-        column(12,
-               div(style = "margin-top: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa;",
-                   h3("Selected Hybrid Zone Details"),
-                   uiOutput("details_panel"),
-                   br(),
-                   plotOutput("cline_plot", height = "400px")
-               )
-        )
-      ),
-      
-      tags$script(HTML(js))
     )
   })
   
@@ -276,15 +307,6 @@ server = function(input, output, session) {
   }
   
   selected_row = reactiveVal(NULL)
-  
-  observeEvent(input$reset, {
-    req(auth())
-    updateTextInput(session, "species_text", value = "")
-    updateSelectInput(session, "taxon_filter", selected = "All")
-    updateSelectInput(session, "habitat_filter", selected = "All")
-    updateSelectInput(session, "continent_filter", selected = "All")
-    selected_row(NULL)
-  })
   
   # 1. FILTERED DATA REACTIVE
   filtered_data = reactive({
@@ -307,13 +329,6 @@ server = function(input, output, session) {
     if (isTruthy(input$taxon_filter)) {
       if (input$taxon_filter != "All") {
         data = data %>% filter(taxon_category_clean == input$taxon_filter)
-      }
-    }
-    
-    # Habitat Filter
-    if (isTruthy(input$habitat_filter)) {
-      if (input$habitat_filter != "All") {
-        data = data %>% filter(habitat_type == input$habitat_filter)
       }
     }
     
@@ -360,6 +375,7 @@ server = function(input, output, session) {
     paste0(line1, "\n", line2)
   })
   
+  # 4. Map Output
   output$map = renderLeaflet({
     req(auth())
     
@@ -442,9 +458,17 @@ server = function(input, output, session) {
     if (nrow(data) == 0) return(tags$em("No hybrid zones match the current filters."))
     
     lapply(seq_len(nrow(data)), function(i) {
-      row = data[i, ]; item_id = paste0("hz_item_", row$id); classes = "hz-item"
+      row = data[i, ]
+      item_id = paste0("hz_item_", row$id)
+      classes = "hz-item"
       if (!is.na(sel_id) && row$id == sel_id) classes = paste(classes, "hz-item-selected")
-      meta_line = if (!is.na(row$continent)) paste(row$taxon_category, "•", row$continent, "•", row$habitat_type) else paste(row$taxon_category, "•", row$habitat_type)
+      
+      # UPDATED: Removed row$habitat_type from the meta line
+      meta_line = if (!is.na(row$continent)) {
+        paste(row$taxon_category, "•", row$continent)
+      } else {
+        row$taxon_category
+      }
       
       tags$div(id = item_id, class = classes, `data-pt-id` = row$pt_id, `data-row-id` = row$id,
                tags$div(class = "hz-item-title",
@@ -544,7 +568,7 @@ server = function(input, output, session) {
     labels = c("Pheno-Genomic", "Genomic", "mtDNA", "nDNA", "Phenotype")
     
     # Applying the Tol Colorblind-Safe Palette
-    cols = c(  "#DDCC77","#88CCEE","#CC6677", "#117733", "#AA4499")
+    cols = c("#117733", "#333333", "#DDCC77", "#88CCEE", "#CC6677")
     
     valid = !(is.na(centers) | is.na(widths))
     
