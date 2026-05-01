@@ -124,7 +124,7 @@ hz = dbReadTable(con, "hybrid_zone_final") %>%
 safe_palette = c(
   "#CC6677", # Amphibian (Rose)
   "#DDCC77", # Bird (Sand)
-  "#117733", # Fish (Green)
+  "#88CCEE", # Fish (Green)
   "#AA4499", # Invert (Purple)
   "#44AA99", # Mammal (Teal)
   "#999933"  # Reptile (Olive)
@@ -145,16 +145,17 @@ all_species = all_species[all_species != "" & !is.na(all_species)]
 
 # SECTION B ===========================================================================================================
 ui = fluidPage(
-  # Style removed from here to revert to default background
+  # Style removed from here to keep login page default
   tags$head(
     tags$style(HTML("
       /* Existing Styles */
       .with-spinner > div { padding-bottom: 0 !important; }
-#map-summary {
+      
+      #map-summary {
         position: absolute; 
-        bottom: 10px;       /* Keeps it at the height you liked */
+        bottom: 10px;       
         left: 50%; 
-        transform: translateX(-50%); /* This centers the element perfectly */
+        transform: translateX(-50%); 
         background: none; 
         font-size: 14px; 
         text-align: center; 
@@ -163,9 +164,9 @@ ui = fluidPage(
         z-index: 9999; 
         line-height: 1.25; 
         border: none;
-        color: #000000;      /* Ensure text is black for visibility */
-        width: 100%;        /* Allows text-align center to work across the map width */
-}
+        color: #000000;      
+        width: 100%;        
+      }
       
       .sidebar-inputs .shiny-input-container, .sidebar-inputs .selectize-control { width: 100% !important; }
       .hz-item { padding: 6px 8px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; border: 1px solid #ddd; background-color: #ffffff; font-size: 0.9em; }
@@ -175,13 +176,24 @@ ui = fluidPage(
       .hz-item-meta { font-size: 0.85em; }
       .equal-height-row { display: flex; flex-wrap: wrap; }
 
-      /* Legend Style */
+      /* Legend Style: Scaled to 80% and moved to Top Left via transform-origin */
       .leaflet .legend {
+        transform: scale(0.8);
+        transform-origin: top left;
         border: 2px solid #000000 !important;
         border-radius: 5px;
         padding: 10px;
         background: rgba(255, 255, 255, 0.9) !important;
         box-shadow: 0 0 15px rgba(0,0,0,0.2);
+        color: black;
+      }
+      
+      /* Legend Color Swatches: Added 1px black border */
+      .leaflet .legend i {
+        border: 1px solid #000000;
+        width: 14px;
+        height: 14px;
+        opacity: 1.0 !important;
       }
     "))
   ),
@@ -189,10 +201,10 @@ ui = fluidPage(
   div(id = "login_page",
       style = "max-width: 450px; margin: 100px auto; padding: 20px;",
       wellPanel(
-        # Apply the 2px black border here to match the map and sidebar
+        # Standardized 2px black border for login panel
         style = "border: 2px solid #000000; border-radius: 8px; background-color: #f5f5f5;", 
         h3("Hybrid Zone Explorer Access", style = "text-align: center; font-weight: bold;"),
-        hr(style = "border-top: 1px solid #000000;"), # Optional: darkened the line to match
+        hr(style = "border-top: 1px solid #000000;"), 
         passwordInput("password_input", "Enter Lab Password:", placeholder = "Required for database access"),
         actionButton("login_btn", "Log In", class = "btn-primary", style = "width: 100%;")
       )
@@ -222,10 +234,10 @@ server = function(input, output, session) {
     req(auth())
     
     # 1. FIXED WRAPPER: Added 'width: 100%' and 'box-sizing' to eliminate side gaps
-    div(style = "background-color: #228B22; color: black; min-height: 100vh; width: 100%; margin: 0; padding: 20px; box-sizing: border-box; position: absolute; left: 0; top: 0;",
+    div(style = "background-color: #316053; color: black; min-height: 100vh; width: 100%; margin: 0; padding: 20px; box-sizing: border-box; position: absolute; left: 0; top: 0;",
         tagList(
           # 2. BLACK TEXT: Changed title color to black
-          titlePanel(h2("Hybrid Zone Explorer", style = "color: black; margin-top: 0; font-weight: bold;")),
+          titlePanel(h2("Hybrid Zone Explorer", style = "color: #89D9B2; margin-top: 0; font-weight: bold;")),
           
           fluidRow(
             class = "equal-height-row",
@@ -433,18 +445,19 @@ server = function(input, output, session) {
         addCircleMarkers(
           lng = ~longitude, 
           lat = ~latitude, 
-          radius = 4,                 # Reduced to 4 to minimize overlap
+          radius = 4,
           fillColor = ~pal(taxon_category_clean), 
           fillOpacity = 1.0, 
           stroke = TRUE, 
-          color = "#000000",          # Maintained the black ring
-          weight = 1.2,               # Slightly thinner stroke for smaller radius
+          color = "#000000",
+          weight = 1.2,
           opacity = 1.0, 
           layerId = ~pt_id,
           label = ~paste0("<i>", tools::toTitleCase(species1_name), "</i> × <i>", tools::toTitleCase(species2_name), "</i>") %>% 
             lapply(htmltools::HTML)
         ) %>%
-        addLegend("bottomright", 
+        # UPDATED: Position moved to topleft
+        addLegend("topleft", 
                   colors = unname(pal_colors), 
                   labels = tools::toTitleCase(names(pal_colors)), 
                   title = "Taxon Category", 
