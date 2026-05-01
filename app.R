@@ -665,10 +665,9 @@ server = function(input, output, session) {
   output$download_filtered_data = downloadHandler(
     filename = function() {
       taxon_tag = if(input$taxon_filter == "All") "AllTaxa" else input$taxon_filter
-      habitat_tag = if(input$habitat_filter == "All") "AllHabitats" else input$habitat_filter
       region_tag = if(input$continent_filter == "All") "Global" else input$continent_filter
       clean_tag = function(x) gsub("[^[:alnum:]]", "", x)
-      paste0("HZ_Export_", clean_tag(taxon_tag), "_", clean_tag(habitat_tag), "_", clean_tag(region_tag), "_", Sys.Date(), ".csv")
+      paste0("HZ_Export_", clean_tag(taxon_tag), "_", clean_tag(region_tag), "_", Sys.Date(), ".csv")
     },
     content = function(file) {
       req(auth())
