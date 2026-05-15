@@ -121,14 +121,7 @@ hz = dbReadTable(con, "hybrid_zone_final") %>%
 # ============================================================
 # Taxonomic order: Amphibian, Bird, Fish, Invert, Mammal, Reptile
 # Taxonomic order: Amphibian, Bird, Fish, Invert, Mammal, Reptile
-safe_palette = c(
-  "#CC6677", # Amphibian (Rose)
-  "#DDCC77", # Bird (Sand)
-  "#88CCEE", # Fish (Green)
-  "#AA4499", # Invert (Purple)
-  "#44AA99", # Mammal (Teal)
-  "#999933"  # Reptile (Olive)
-)
+safe_palette = c("#CC6677", "#44AA99", "#88CCEE","#332288","#F0E442","#E69F00" )
 
 taxa = sort(unique(hz$taxon_category_clean))
 taxa = taxa[taxa != "" & !is.na(taxa) & taxa != "na"]
