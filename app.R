@@ -505,6 +505,29 @@ server = function(input, output, session) {
     session$sendCustomMessage("scrollToHzItem", list(id = paste0("hz_item_", row$id)))
   })
   
+  get_cc_text <- function(license_url) {
+    if (is.na(license_url) || !nzchar(license_url) || license_url == "na") return("Unknown License")
+    clean_url <- tolower(gsub(" ", "", license_url))
+    
+    if (grepl("publicdomain|cc0", clean_url)) {
+      return("CC0 / Public Domain")
+    } else if (grepl("by-nc-nd", clean_url)) {
+      return("CC BY-NC-ND")
+    } else if (grepl("by-nc-sa", clean_url)) {
+      return("CC BY-NC-SA")
+    } else if (grepl("by-nc", clean_url)) {
+      return("CC BY-NC")
+    } else if (grepl("by-nd", clean_url)) {
+      return("CC BY-ND")
+    } else if (grepl("by-sa", clean_url)) {
+      return("CC BY-SA")
+    } else if (grepl("by", clean_url)) {
+      return("CC BY")
+    }
+    
+    return("View License") # Clean fallback if it's a non-standard URL
+  }
+  
   output$details_panel = renderUI({
     req(auth())
     row = selected_row()
@@ -513,10 +536,95 @@ server = function(input, output, session) {
     cont = ifelse(is.na(row$continent), "None / Open Water", row$continent)
     bg_color = paste0(pal(row$taxon_category_clean), "20")
     
+    # Standardized card renderer for Parent 1, Hybrid, and Parent 2
+    render_image_card <- function(title, img_url, user_name, inat_url, license_url, card_id) {
+      has_img <- !is.na(img_url) && nzchar(img_url) && img_url != "na"
+      
+      # Determine display text based on the spreadsheet URL
+      has_license <- !is.na(license_url) && nzchar(license_url) && license_url != "na"
+      display_license_text <- if(has_license) get_cc_text(license_url) else NULL
+      
+      div(style = "flex: 1; min-width: 200px; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 10px; background: #ffffff; display: flex; flex-direction: column; justify-content: space-between;",
+          tags$div(
+            tags$strong(style = "display: block; margin-bottom: 8px; font-size: 1.1em;", title)
+          ),
+          
+          # Clickable image container
+          tags$div(
+            id = if(has_img) card_id else NULL,
+            style = paste0(
+              "height: 180px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; background-color: #eaeaea; border-radius: 4px; overflow: hidden;",
+              if(has_img) "cursor: pointer; transition: transform 0.2s;" else ""
+            ),
+            onclick = if(has_img) sprintf("Shiny.setInputValue('zoom_image_click', '%s', {priority: 'event'})", img_url) else NULL,
+            
+            if (has_img) {
+              tags$img(src = img_url, style = "max-width: 100%; max-height: 100%; object-fit: contain;")
+            } else {
+              tags$span(style = "color: #777; font-style: italic;", "No image available")
+            }
+          ),
+          
+          # Photo Credits and License Links
+          tags$div(style = "font-size: 0.9em; min-height: 38px; display: flex; flex-direction: column; justify-content: center;",
+                   if (!is.na(user_name) && nzchar(user_name) && user_name != "na") {
+                     tagList(
+                       tags$div(
+                         tags$span(style = "color: #555;", "Image credit: "),
+                         if (!is.na(inat_url) && nzchar(inat_url) && inat_url != "na") {
+                           tags$a(href = inat_url, target = "_blank", style = "font-weight: 600; text-decoration: underline;", user_name)
+                         } else {
+                           tags$span(style = "font-weight: 600;", user_name)
+                         }
+                       ),
+                       if (has_license) {
+                         tags$div(style = "font-size: 0.8em; margin-top: 2px;",
+                                  tags$a(href = license_url, target = "_blank", style = "color: #666; text-decoration: underline;", display_license_text)
+                         )
+                       }
+                     )
+                   } else {
+                     tags$span(style = "color: #999; font-style: italic;", "No credit metadata")
+                   }
+          )
+      )
+    }
+    
     div(style = paste0("background-color:", bg_color, "; padding:16px; border-radius:10px;"),
-        tags$h2(style = "margin-top: 0; margin-bottom: 5px;", tags$strong(paste(row$species1_common_name, "×", row$species2_common_name))),
-        tags$h4(style = "margin-top: 0; color: #555; font-style: italic;", paste0("(", row$species1_name, " × ", row$species2_name, ")")),
         
+        # 1. Primary Taxonomy Titles at the top
+        tags$h2(style = "margin-top: 0; margin-bottom: 5px;", tags$strong(paste(row$species1_common_name, "×", row$species2_common_name))),
+        tags$h4(style = "margin-top: 0; margin-bottom: 20px; color: #555; font-style: italic;", paste0("(", row$species1_name, " × ", row$species2_name, ")")),
+        
+        # 2. Image Strip (Rearranged: Sp1 | Hybrid | Sp2)
+        div(style = "display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;",
+            render_image_card(
+              title = htmltools::HTML(paste0("<i>", row$species1_name, "</i>")),
+              img_url = row$sp1_image_url,
+              user_name = row$sp1_image_user,
+              inat_url = row$sp1_image_inat_url,
+              license_url = row$sp1_image_cc_license, # URL from your sheet passed directly here
+              card_id = "sp1_card"
+            ),
+            render_image_card(
+              title = htmltools::HTML(paste0("<i>", row$species1_name, "</i> × <i>", row$species2_name, "</i>")),
+              img_url = row$hybrid_image_url,
+              user_name = row$hybrid_image_credit,
+              inat_url = row$hybrid_image_inat_url,
+              license_url = row$hybrid_image_cc_license, # URL from your sheet passed directly here
+              card_id = "hybrid_card"
+            ),
+            render_image_card(
+              title = htmltools::HTML(paste0("<i>", row$species2_name, "</i>")),
+              img_url = row$sp2_image_url,
+              user_name = row$sp2_image_user,
+              inat_url = row$sp2_image_inat_url,
+              license_url = row$sp2_image_cc_license, # URL from your sheet passed directly here
+              card_id = "sp2_card"
+            )
+        ),
+        
+        # 3. Numeric & Environmental Details
         div(style = "border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:12px; background: white;",
             tags$h4(tags$strong("Hybrid Zone Information")), tags$hr(),
             div(style = "display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:10px;",
@@ -554,6 +662,19 @@ server = function(input, output, session) {
                 div(strong("Dispersal Citation:"), br(), format_citations(row$dispersal_citation, row$dispersal_doi)),
                 div(strong("Notes:"), br(), if(!is.na(row$gen_time_and_dispersal_note) && row$gen_time_and_dispersal_note != "na") row$gen_time_and_dispersal_note else "")))
     )
+  })
+  
+  # 4. Standalone Observer to launch the high-res zoom modal window
+  observeEvent(input$zoom_image_click, {
+    showModal(modalDialog(
+      title = NULL,
+      easyClose = TRUE,
+      footer = modalButton("Close"),
+      size = "l",
+      tags$div(style = "text-align: center;",
+               tags$img(src = input$zoom_image_click, style = "max-width: 100%; max-height: 75vh; object-fit: contain; border-radius: 4px;")
+      )
+    ))
   })
   
   output$cline_plot = renderPlot({
