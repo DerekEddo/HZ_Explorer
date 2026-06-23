@@ -199,8 +199,23 @@ ui = fluidPage(
         h3("Hybrid Zone Explorer Access", style = "text-align: center; font-weight: bold;"),
         hr(style = "border-top: 1px solid #000000;"), 
         passwordInput("password_input", "Enter Lab Password:", placeholder = "Required for database access"),
-        actionButton("login_btn", "Log In", class = "btn-primary", style = "width: 100%;")
-      )
+        actionButton("login_btn", "Log In", class = "btn-primary", style = "width: 100%;"),
+        
+        # ---> Insert the script right here inside the panel <---
+        tags$script(HTML("
+          $(document).on('shiny:visualchange', function(event) {
+            // 1. Focus on the password box when the panel appears
+            $('#password_input').focus();
+            
+            // 2. Listen for the Enter key (13) inside the password box
+            $('#password_input').on('keypress', function(e) {
+              if (e.which === 13) {
+                $('#login_btn').click();
+              }
+            });
+          });
+        "))
+      ),
   ),
   
   uiOutput("secure_ui")
