@@ -203,19 +203,25 @@ ui = fluidPage(
         
         # ---> Insert the script right here inside the panel <---
         tags$script(HTML("
-          $(document).on('shiny:visualchange', function(event) {
-            // 1. Focus on the password box when the panel appears
-            $('#password_input').focus();
-            
-            // 2. Listen for the Enter key (13) inside the password box
-            $('#password_input').on('keypress', function(e) {
-              if (e.which === 13) {
-                $('#login_btn').click();
-              }
-            });
-          });
-        "))
-      ),
+  $(document).on('shiny:visualchange', function(event) {
+    $('#password_input').focus();
+    
+    $('#password_input').on('keypress', function(e) {
+      if (e.which === 13) {
+        e.preventDefault(); // Stop default form submissions
+        
+        // Force the input element to trigger a change event so Shiny captures the current text
+        $(this).trigger('change');
+        
+        // Give Shiny a tiny 50ms window to register the string before clicking the button
+        setTimeout(function() {
+          $('#login_btn').click();
+        }, 50);
+      }
+    });
+  });
+"))
+        ),
   ),
   
   uiOutput("secure_ui")
