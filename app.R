@@ -120,7 +120,6 @@ hz = dbReadTable(con, "hybrid_zone_final") %>%
 #  COLOR PALETTE & AUTOCOMPLETE LIST
 # ============================================================
 # Taxonomic order: Amphibian, Bird, Fish, Invert, Mammal, Reptile
-# Taxonomic order: Amphibian, Bird, Fish, Invert, Mammal, Reptile
 safe_palette = c("#CC6677", "#44AA99", "#88CCEE","#332288","#F0E442","#E69F00" )
 
 taxa = sort(unique(hz$taxon_category_clean))
@@ -138,7 +137,6 @@ all_species = all_species[all_species != "" & !is.na(all_species)]
 
 # SECTION B ===========================================================================================================
 ui = fluidPage(
-  # Style removed from here to keep login page default
   tags$head(
     tags$style(HTML("
       /* Existing Styles */
@@ -194,26 +192,20 @@ ui = fluidPage(
   div(id = "login_page",
       style = "max-width: 450px; margin: 100px auto; padding: 20px;",
       wellPanel(
-        # Standardized 2px black border for login panel
         style = "border: 2px solid #000000; border-radius: 8px; background-color: #f5f5f5;", 
         h3("Hybrid Zone Explorer Access", style = "text-align: center; font-weight: bold;"),
         hr(style = "border-top: 1px solid #000000;"), 
         passwordInput("password_input", "Enter Lab Password:", placeholder = "Required for database access"),
         actionButton("login_btn", "Log In", class = "btn-primary", style = "width: 100%;"),
         
-        # ---> Insert the script right here inside the panel <---
         tags$script(HTML("
   $(document).on('shiny:visualchange', function(event) {
     $('#password_input').focus();
     
     $('#password_input').on('keypress', function(e) {
       if (e.which === 13) {
-        e.preventDefault(); // Stop default form submissions
-        
-        // Force the input element to trigger a change event so Shiny captures the current text
+        e.preventDefault();
         $(this).trigger('change');
-        
-        // Give Shiny a tiny 50ms window to register the string before clicking the button
         setTimeout(function() {
           $('#login_btn').click();
         }, 50);
@@ -221,7 +213,7 @@ ui = fluidPage(
     });
   });
 "))
-        ),
+      ),
   ),
   
   uiOutput("secure_ui")
@@ -247,10 +239,8 @@ server = function(input, output, session) {
   output$secure_ui <- renderUI({
     req(auth())
     
-    # 1. FIXED WRAPPER: Added 'width: 100%' and 'box-sizing' to eliminate side gaps
     div(style = "background-color: #316053; color: black; min-height: 100vh; width: 100%; margin: 0; padding: 20px; box-sizing: border-box; position: absolute; left: 0; top: 0;",
         tagList(
-          # 2. BLACK TEXT: Changed title color to black
           titlePanel(h2("Hybrid Zone Explorer", style = "color: #89D9B2; margin-top: 0; font-weight: bold;")),
           
           fluidRow(
@@ -258,7 +248,8 @@ server = function(input, output, session) {
             # --- 1. LEFT COLUMN ---
             column(3,
                    div(class = "sidebar-inputs", 
-                       style = "background-color: #f5f5f5; padding: 15px; border-radius: 8px; border: 2px solid #000000; box-shadow: 0 2px 5px rgba(0,0,0,0.05); height: 700px; display: flex; flex-direction: column; color: black;",
+                       # REDUCED HEIGHT: Changed from 700px to 500px to align with map and reveal details panel
+                       style = "background-color: #f5f5f5; padding: 15px; border-radius: 8px; border: 2px solid #000000; box-shadow: 0 2px 5px rgba(0,0,0,0.05); height: 500px; display: flex; flex-direction: column; color: black;",
                        
                        tags$div(style = "text-align:center; margin-bottom:15px;",
                                 tags$img(src = "lab.logo.png", height = "80px")
@@ -280,8 +271,9 @@ server = function(input, output, session) {
                        div(style = "margin-bottom: 5px;",
                            selectInput("continent_filter", "Continent:", choices = c("All", "Africa","Antarctica","Asia","Europe","North America","Oceania","South America","None / Open Water"), width = "100%")),
                        
-                       downloadButton("download_filtered_data", "Download Filtered Data (.csv)", 
-                                      style = "width: 100%; background-color: #2c3e50; color: white; border: none; margin-bottom: 10px;"),
+                       # DISABLED FOR NOW:
+                       # downloadButton("download_filtered_data", "Download Filtered Data (.csv)", 
+                       #                style = "width: 100%; background-color: #2c3e50; color: white; border: none; margin-bottom: 10px;"),
                        
                        h4("Matching Hybrid Zones", style = "margin-top: 5px;"),
                        tags$div(id = "hz-list-container", 
@@ -296,7 +288,8 @@ server = function(input, output, session) {
                    div(style = "position: relative; border: 2px solid #000000; border-radius: 8px; overflow: hidden; background-color: white;",
                        withSpinner(
                          div(style = "position: relative;",
-                             leafletOutput("map", height = "697px"),
+                             # REDUCED HEIGHT: Changed from 697px to 500px to match sidebar container height
+                             leafletOutput("map", height = "500px"),
                              div(id = "map-summary", textOutput("map_summary"))
                          )
                        )
@@ -342,7 +335,6 @@ server = function(input, output, session) {
     
     data = hz
     
-    # Species Search: Only run if the input exists and isn't empty
     if (isTruthy(input$species_text)) {
       sp = tolower(str_squish(input$species_text))
       data = data %>% filter(
@@ -353,14 +345,12 @@ server = function(input, output, session) {
       )
     }
     
-    # Taxon Filter: Only run if the dropdown has actually rendered in the UI
     if (isTruthy(input$taxon_filter)) {
       if (input$taxon_filter != "All") {
         data = data %>% filter(taxon_category_clean == input$taxon_filter)
       }
     }
     
-    # Continent Filter
     if (isTruthy(input$continent_filter)) {
       if (input$continent_filter == "None / Open Water") {
         data = data %>% filter(is.na(continent))
@@ -377,7 +367,6 @@ server = function(input, output, session) {
     req(auth())
     data = filtered_data()
     bounds = input$map_bounds
-    # If the map hasn't loaded bounds yet, return all filtered data
     if (is.null(bounds)) return(data) 
     
     data %>% filter(
@@ -391,7 +380,6 @@ server = function(input, output, session) {
   # 3. MAP SUMMARY TEXT
   output$map_summary = renderText({
     req(auth())
-    # Don't try to summarize until the filters actually exist
     req(isTruthy(input$taxon_filter)) 
     
     data = visible_data()
@@ -432,12 +420,12 @@ server = function(input, output, session) {
       addCircleMarkers(
         lng = row$longitude, 
         lat = row$latitude, 
-        radius = 5,              # Slightly larger than the new 4px base size
+        radius = 5,
         fillColor = target_color, 
         fillOpacity = 1.0,
         stroke = TRUE, 
-        color = "#000000",       # Maintained the black ring
-        weight = 2.5,            # Thicker weight for the highlighted point
+        color = "#000000",
+        weight = 2.5,
         opacity = 1.0,
         group = "highlight"
       )
@@ -470,7 +458,6 @@ server = function(input, output, session) {
           label = ~paste0("<i>", tools::toTitleCase(species1_name), "</i> × <i>", tools::toTitleCase(species2_name), "</i>") %>% 
             lapply(htmltools::HTML)
         ) %>%
-        # UPDATED: Position moved to topleft
         addLegend("topleft", 
                   colors = unname(pal_colors), 
                   labels = tools::toTitleCase(names(pal_colors)), 
@@ -492,7 +479,6 @@ server = function(input, output, session) {
       classes = "hz-item"
       if (!is.na(sel_id) && row$id == sel_id) classes = paste(classes, "hz-item-selected")
       
-      # UPDATED: Removed row$habitat_type from the meta line
       meta_line = if (!is.na(row$continent)) {
         paste(row$taxon_category, "•", row$continent)
       } else {
@@ -546,7 +532,7 @@ server = function(input, output, session) {
       return("CC BY")
     }
     
-    return("View License") # Clean fallback if it's a non-standard URL
+    return("View License")
   }
   
   output$details_panel = renderUI({
@@ -557,11 +543,9 @@ server = function(input, output, session) {
     cont = ifelse(is.na(row$continent), "None / Open Water", row$continent)
     bg_color = paste0(pal(row$taxon_category_clean), "20")
     
-    # Standardized card renderer for Parent 1, Hybrid, and Parent 2
     render_image_card <- function(title, img_url, user_name, inat_url, license_url, card_id) {
       has_img <- !is.na(img_url) && nzchar(img_url) && img_url != "na"
       
-      # Determine display text based on the spreadsheet URL
       has_license <- !is.na(license_url) && nzchar(license_url) && license_url != "na"
       display_license_text <- if(has_license) get_cc_text(license_url) else NULL
       
@@ -570,7 +554,6 @@ server = function(input, output, session) {
             tags$strong(style = "display: block; margin-bottom: 8px; font-size: 1.1em;", title)
           ),
           
-          # Clickable image container
           tags$div(
             id = if(has_img) card_id else NULL,
             style = paste0(
@@ -586,7 +569,6 @@ server = function(input, output, session) {
             }
           ),
           
-          # Photo Credits and License Links
           tags$div(style = "font-size: 0.9em; min-height: 38px; display: flex; flex-direction: column; justify-content: center;",
                    if (!is.na(user_name) && nzchar(user_name) && user_name != "na") {
                      tagList(
@@ -613,18 +595,16 @@ server = function(input, output, session) {
     
     div(style = paste0("background-color:", bg_color, "; padding:16px; border-radius:10px;"),
         
-        # 1. Primary Taxonomy Titles at the top
         tags$h2(style = "margin-top: 0; margin-bottom: 5px;", tags$strong(paste(row$species1_common_name, "×", row$species2_common_name))),
         tags$h4(style = "margin-top: 0; margin-bottom: 20px; color: #555; font-style: italic;", paste0("(", row$species1_name, " × ", row$species2_name, ")")),
         
-        # 2. Image Strip (Rearranged: Sp1 | Hybrid | Sp2)
         div(style = "display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;",
             render_image_card(
               title = htmltools::HTML(paste0("<i>", row$species1_name, "</i>")),
               img_url = row$sp1_image_url,
               user_name = row$sp1_image_user,
               inat_url = row$sp1_image_inat_url,
-              license_url = row$sp1_image_cc_license, # URL from your sheet passed directly here
+              license_url = row$sp1_image_cc_license,
               card_id = "sp1_card"
             ),
             render_image_card(
@@ -632,7 +612,7 @@ server = function(input, output, session) {
               img_url = row$hybrid_image_url,
               user_name = row$hybrid_image_credit,
               inat_url = row$hybrid_image_inat_url,
-              license_url = row$hybrid_image_cc_license, # URL from your sheet passed directly here
+              license_url = row$hybrid_image_cc_license,
               card_id = "hybrid_card"
             ),
             render_image_card(
@@ -640,12 +620,11 @@ server = function(input, output, session) {
               img_url = row$sp2_image_url,
               user_name = row$sp2_image_user,
               inat_url = row$sp2_image_inat_url,
-              license_url = row$sp2_image_cc_license, # URL from your sheet passed directly here
+              license_url = row$sp2_image_cc_license,
               card_id = "sp2_card"
             )
         ),
         
-        # 3. Numeric & Environmental Details
         div(style = "border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:12px; background: white;",
             tags$h4(tags$strong("Hybrid Zone Information")), tags$hr(),
             div(style = "display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:10px;",
@@ -685,7 +664,6 @@ server = function(input, output, session) {
     )
   })
   
-  # 4. Standalone Observer to launch the high-res zoom modal window
   observeEvent(input$zoom_image_click, {
     showModal(modalDialog(
       title = NULL,
@@ -703,21 +681,17 @@ server = function(input, output, session) {
     row = selected_row()
     if (is.null(row)) return(NULL)
     
-    # 1. ORGANIZE DATA
     centers = c(row$new_pheno_geno_cline_center, row$new_genomic_cline_center, 
                 row$new_mt_cline_center, row$new_n_cline_center, row$new_pheno_cline_center)
     widths  = c(row$new_pheno_geno_cline_width, row$new_genomic_cline_width, 
                 row$new_mt_cline_width, row$new_n_cline_width, row$new_pheno_cline_width)
     
-    # Uncertainty bounds (Pheno-Genomic and Genomic are NA per your setup)
     width_lower = c(NA, NA, row$new_mt_width_uncertainty_lower_bound, 
                     row$new_nuc_width_uncertainty_lower_bound, row$new_pheno_width_uncertainty_lower_bound)
     width_upper = c(NA, NA, row$new_mt_width_uncertainty_upper_bound, 
                     row$new_nuc_width_uncertainty_upper_bound, row$new_pheno_width_uncertainty_upper_bound)
     
     labels = c("Pheno-Genomic", "Genomic", "mtDNA", "nDNA", "Phenotype")
-    
-    # Applying the Tol Colorblind-Safe Palette
     cols = c("#117733", "#333333", "#DDCC77", "#88CCEE", "#CC6677")
     
     valid = !(is.na(centers) | is.na(widths))
@@ -726,11 +700,9 @@ server = function(input, output, session) {
       plot.new(); text(0.5, 0.5, "No cline available for this hybrid zone", cex = 2); return()
     }
     
-    # 2. SETUP PLOT AREA
     xmin = min(centers[valid] - 3 * widths[valid], na.rm = TRUE)
     xmax = max(centers[valid] + 3 * widths[valid], na.rm = TRUE)
     
-    # Margins adjusted for large axis labels
     par(lend = 0, mar = c(6, 6, 5, 2) + 0.1) 
     
     plot(NA, xlim = c(xmin, xmax), ylim = c(0, 1), 
@@ -740,14 +712,12 @@ server = function(input, output, session) {
          cex.lab = 1.8, cex.axis = 1.5, cex.main = 2.2, 
          xaxs = "i", yaxs = "i", yaxt = "n")
     
-    # Marginal note explaining visual elements
     mtext("Horizontal bars = estimated width", 
           side = 3, line = 0.5, cex = 1.2, font = 3, col = "gray30")
     
     axis(side = 2, at = seq(0, 1, 0.2), labels = seq(0, 1, 0.2), 
          las = 1, cex.axis = 1.5, tck = -0.02)
     
-    # 3. DRAW CLINES AND POLYGONS
     offset_step = 0.06
     offset_index = 0
     
@@ -758,7 +728,6 @@ server = function(input, output, session) {
       x_centered = x - mean(centers[valid])
       y = 1 / (1 + exp(-4 * (x_centered - (c - mean(centers[valid]))) / w))
       
-      # Draw 95% CI Shading at 60% Opacity
       w_l = width_lower[i]; w_u = width_upper[i]
       if (!is.na(w_l) && !is.na(w_u)) {
         ci_u = 1 / (1 + exp(-4 * (x - c) / w_l))
@@ -767,10 +736,8 @@ server = function(input, output, session) {
                 col = adjustcolor(cols[i], alpha.f = 0.6), border = NA)
       }
       
-      # Draw Main Cline Line
       lines(x, y, lwd = 7.5, col = cols[i])
       
-      # Draw Width Segment Bar
       y_off = 0.5 + (offset_index - (sum(valid) - 1) / 2) * offset_step
       segments(x0 = c - w/2, x1 = c + w/2, y0 = y_off, y1 = y_off, 
                col = adjustcolor(cols[i], alpha.f = 0.7), lwd = 7.5, lend = 1)
@@ -778,8 +745,6 @@ server = function(input, output, session) {
       offset_index = offset_index + 1
     }
     
-    # 4. UNIFIED DYNAMIC LEGEND
-    # Legend shading matches the 60% opacity on the plot
     shaded_cols = adjustcolor(cols[valid], alpha.f = 0.6)
     
     legend("bottomright", 
@@ -797,19 +762,20 @@ server = function(input, output, session) {
            bty = "n")               
   })
   
-  output$download_filtered_data = downloadHandler(
-    filename = function() {
-      taxon_tag = if(input$taxon_filter == "All") "AllTaxa" else input$taxon_filter
-      region_tag = if(input$continent_filter == "All") "Global" else input$continent_filter
-      clean_tag = function(x) gsub("[^[:alnum:]]", "", x)
-      paste0("HZ_Export_", clean_tag(taxon_tag), "_", clean_tag(region_tag), "_", Sys.Date(), ".csv")
-    },
-    content = function(file) {
-      req(auth())
-      export_data = filtered_data() %>% select(-id, -pt_id, -continent, -ends_with("_clean")) %>% rename_with(~ str_remove(., "^new_"), starts_with("new_"))
-      write.csv(export_data, file, row.names = FALSE, na = "na")
-    }
-  )
+  # DISABLED FOR NOW:
+  # output$download_filtered_data = downloadHandler(
+  #   filename = function() {
+  #     taxon_tag = if(input$taxon_filter == "All") "AllTaxa" else input$taxon_filter
+  #     region_tag = if(input$continent_filter == "All") "Global" else input$continent_filter
+  #     clean_tag = function(x) gsub("[^[:alnum:]]", "", x)
+  #     paste0("HZ_Export_", clean_tag(taxon_tag), "_", clean_tag(region_tag), "_", Sys.Date(), ".csv")
+  #   },
+  #   content = function(file) {
+  #     req(auth())
+  #     export_data = filtered_data() %>% select(-id, -pt_id, -continent, -ends_with("_clean")) %>% rename_with(~ str_remove(., "^new_"), starts_with("new_"))
+  #     write.csv(export_data, file, row.names = FALSE, na = "na")
+  #   }
+  # )
 }
 
 shinyApp(ui, server)
