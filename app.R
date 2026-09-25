@@ -167,6 +167,43 @@ ui = fluidPage(
       .hz-item-meta { font-size: 0.85em; }
       .equal-height-row { display: flex; flex-wrap: wrap; }
 
+      /* ============================================================
+         GLOBAL & LOCAL GOLD SCROLLBAR STYLING
+         (Applies to entire page + list container)
+         ============================================================ */
+
+      /* 1. Firefox & Modern Standard Browsers */
+      html, body, #hz-list-container {
+        scrollbar-width: thin !important;
+        scrollbar-color: #d4af37 #e0e0e0 !important;
+      }
+
+      /* 2. WebKit Browsers (Chrome, Edge, Safari, Opera, RStudio Viewer) */
+      ::-webkit-scrollbar {
+        width: 12px !important;
+        height: 12px !important;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #e0e0e0 !important;
+        border-radius: 6px !important;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background-color: #d4af37 !important; /* Metallic Gold */
+        border-radius: 6px !important;
+        border: 2px solid #e0e0e0 !important; /* Inset border */
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background-color: #b8860b !important; /* Darker Gold on Hover */
+      }
+
+      /* List container specifics */
+      #hz-list-container {
+        overflow-y: auto !important;
+      }
+
       /* Legend Style: Scaled to 80% and moved to Top Left via transform-origin */
       .leaflet .legend {
         transform: scale(0.8);
@@ -248,7 +285,6 @@ server = function(input, output, session) {
             # --- 1. LEFT COLUMN ---
             column(3,
                    div(class = "sidebar-inputs", 
-                       # REDUCED HEIGHT: Changed from 700px to 500px to align with map and reveal details panel
                        style = "background-color: #f5f5f5; padding: 15px; border-radius: 8px; border: 2px solid #000000; box-shadow: 0 2px 5px rgba(0,0,0,0.05); height: 500px; display: flex; flex-direction: column; color: black;",
                        
                        tags$div(style = "text-align:center; margin-bottom:15px;",
@@ -271,10 +307,6 @@ server = function(input, output, session) {
                        div(style = "margin-bottom: 5px;",
                            selectInput("continent_filter", "Continent:", choices = c("All", "Africa","Antarctica","Asia","Europe","North America","Oceania","South America","None / Open Water"), width = "100%")),
                        
-                       # DISABLED FOR NOW:
-                       # downloadButton("download_filtered_data", "Download Filtered Data (.csv)", 
-                       #                style = "width: 100%; background-color: #2c3e50; color: white; border: none; margin-bottom: 10px;"),
-                       
                        h4("Matching Hybrid Zones", style = "margin-top: 5px;"),
                        tags$div(id = "hz-list-container", 
                                 style = "flex-grow: 1; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 6px;",
@@ -288,7 +320,6 @@ server = function(input, output, session) {
                    div(style = "position: relative; border: 2px solid #000000; border-radius: 8px; overflow: hidden; background-color: white;",
                        withSpinner(
                          div(style = "position: relative;",
-                             # REDUCED HEIGHT: Changed from 697px to 500px to match sidebar container height
                              leafletOutput("map", height = "500px"),
                              div(id = "map-summary", textOutput("map_summary"))
                          )
@@ -761,21 +792,6 @@ server = function(input, output, session) {
            x.intersp = 1.2,         
            bty = "n")               
   })
-  
-  # DISABLED FOR NOW:
-  # output$download_filtered_data = downloadHandler(
-  #   filename = function() {
-  #     taxon_tag = if(input$taxon_filter == "All") "AllTaxa" else input$taxon_filter
-  #     region_tag = if(input$continent_filter == "All") "Global" else input$continent_filter
-  #     clean_tag = function(x) gsub("[^[:alnum:]]", "", x)
-  #     paste0("HZ_Export_", clean_tag(taxon_tag), "_", clean_tag(region_tag), "_", Sys.Date(), ".csv")
-  #   },
-  #   content = function(file) {
-  #     req(auth())
-  #     export_data = filtered_data() %>% select(-id, -pt_id, -continent, -ends_with("_clean")) %>% rename_with(~ str_remove(., "^new_"), starts_with("new_"))
-  #     write.csv(export_data, file, row.names = FALSE, na = "na")
-  #   }
-  # )
 }
 
 shinyApp(ui, server)
